@@ -1,0 +1,16 @@
+Group
+
+structure MLLexer
+
+is
+
+  mlton-basis-lex-proxy.cm
+  ../../lib/mllpt-lib/ml-lpt/lib/ml-lpt-lib.cm
+  ../ast/sources.cm
+  ../control/sources.cm
+
+  sml-basis-lex-proxy.cm
+
+  ml-grm.cm
+
+  ml.lex.sml

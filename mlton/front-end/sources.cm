@@ -17,15 +17,17 @@ is
 ../../lib/mlton/sources.cm
 #if (defined (SMLNJ_VERSION))
 ml-yacc-lib-proxy.cm
+ml-yacc-lib-proxy.cm
 #else
 ../../lib/mlyacc-lib/ml-yacc-lib.cm
 #endif
+../../lib/mllpt-lib/ml-lpt/lib/ml-lpt-lib.cm
 ../ast/sources.cm
 ../control/sources.cm
 
-ml.grm.sig
-ml.grm.sml
-ml.lex.sml
+ml-lex.cm
+ml-grm.cm
+
 front-end.sig
 front-end.fun
 

@@ -1,0 +1,17 @@
+Group
+
+functor MLParserFun
+structure Tokens
+signature SOURCE_MAP
+
+is
+  ../../lib/mllpt-lib/ml-lpt/lib/ml-lpt-lib.cm
+
+  mlton-basis-grm-proxy.cm
+  ../ast/sources.cm
+  ../control/sources.cm
+
+  sml-basis-grm-proxy.cm
+
+  source-map.sig
+  ml.grm.sml
