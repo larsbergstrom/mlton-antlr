@@ -40,7 +40,7 @@ ifneq (,$(findstring $(HOST_OS), cygwin mingw))
 else
   # We're compiling MLton with an older version of itself, so use the stubs for
   # the MLton structure.
-  FILE := mlton-stubs.mlb
+  FILE := mlton.mlb
 endif
 endif
 
@@ -50,7 +50,6 @@ FLAGS += $(COMPILE_ARGS)
 
 FRONT_END_SOURCES :=		\
 	front-end/ml.lex.sml	\
-	front-end/ml.grm.sig	\
 	front-end/ml.grm.sml	\
 	front-end/mlb.lex.sml	\
 	front-end/mlb.grm.sig	\
@@ -74,8 +73,10 @@ control/version.sml: control/version_sml.src
 
 front-end/%.lex.sml: front-end/%.lex
 	$(MAKE) -C front-end $(@F)
-front-end/%.grm.sig front-end/%.grm.sml: front-end/%.grm
+front-end/mlb.grm.sig front-end/mlb.grm.sml: front-end/mlb.grm
 	$(MAKE) -C front-end $(<F).sig $(<F).sml
+front-end/ml.grm.sml: front-end/ml.grm
+	$(MAKE) -C front-end $(<F).sml
 
 # Pass $(PATH) to upgrade-basis because it is run via
 # #!/usr/bin/env bash, which resets the path.

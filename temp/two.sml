@@ -1,12 +1,6 @@
-functor UnsignedIntegralComparisons () =
-   struct
-      local
-         structure S = IntegralComparisons (type t = int 
-                                            val < = ltu)
-      in
-         val ltu = S.<
-         val leu = S.<=
-         val gtu = S.>
-         val geu = S.>=
-      end
+signature CHOOSE_REALN_ARG =
+   sig
+      type 'a t
+      val fReal32: Real32.real t
+      val fReal64: Real64.real t
    end

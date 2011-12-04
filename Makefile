@@ -134,7 +134,7 @@ docs: dirs
 		bin/make-pdf-guide; \
 	fi
 
-LIBRARIES := ckit-lib cml mllpt-lib mlnlffi-lib mlrisc-lib mlyacc-lib smlnj-lib
+LIBRARIES := ckit-lib cml mllpt-lib mlnlffi-lib mlrisc-lib mlyacc-lib smlnj-lib 
 
 .PHONY: libraries-no-check
 libraries-no-check:
