@@ -1,6 +1,4 @@
-signature CHOOSE_REALN_ARG =
+signature PRIM_WORD =
    sig
-      type 'a t
-      val fReal32: Real32.real t
-      val fReal64: Real64.real t
+      type t = word
    end

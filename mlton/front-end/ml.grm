@@ -512,17 +512,23 @@ specs  :                   => (p ("specs1 "); Spec.makeRegion (Spec.Empty, Regio
 spec : specnode => (p ("spec "); Spec.makeRegion (specnode, posToReg (FULL_SPAN)))
        ;
 
-specnode : VAL valdescs         => (p ("specnode1 "); Spec.Val (Vector.fromList valdescs))
-         | %try TYPE typdescs        => (p ("specnode2 "); Spec.Type (Vector.fromList typdescs))
+(* typBind/typdescs and sigexp/sigids have the same first several tokens.
+   In this rule, we use backtracking to permit them to co-exist. Otherwise, 
+   we could create a new production that combinds them, but then we would be
+   unable to share the definitions used here with other productions that do
+   not share this distinction issue.									   
+ *)
+specnode : %try VAL valdescs         => (p ("specnode1 "); Spec.Val (Vector.fromList valdescs))
          | %try TYPE typBind         => (p ("specnode3 "); Spec.TypeDefs typBind) 
-         | EQTYPE typdescs      => (p ("specnode4 "); Spec.Eqtype (Vector.fromList typdescs))
-         | DATATYPE datatypeRhsNoWithtype => (p ("specnode5 "); Spec.Datatype datatypeRhsNoWithtype)
-         | EXCEPTION exndescs   => (p ("specnode6 "); Spec.Exception (Vector.fromList exndescs))
-         | STRUCTURE strdescs   => (p ("specnode7 "); Spec.Structure (Vector.fromList strdescs))
+         | %try TYPE typdescs        => (p ("specnode2 "); Spec.Type (Vector.fromList typdescs))
+         | %try EQTYPE typdescs      => (p ("specnode4 "); Spec.Eqtype (Vector.fromList typdescs))
+         | %try DATATYPE datatypeRhsNoWithtype => (p ("specnode5 "); Spec.Datatype datatypeRhsNoWithtype)
+         | %try EXCEPTION exndescs   => (p ("specnode6 "); Spec.Exception (Vector.fromList exndescs))
+         | %try STRUCTURE strdescs   => (p ("specnode7 "); Spec.Structure (Vector.fromList strdescs))
          | %try INCLUDE sigexp       => (p ("specnode8 "); Spec.IncludeSigexp sigexp)
          | %try INCLUDE sigid sigids (* p. 59 *)
            => (p ("specnode9 "); Spec.IncludeSigids (Vector.fromList (sigid :: sigids)) )
-         | sharespec
+         | %try sharespec
            => (p ("specnode10 "); Spec.Sharing {spec = Spec.makeRegion (Spec.Empty, posToReg (FULL_SPAN)),
                           equations = (Vector.new1
                                        (Equation.makeRegion (sharespec, posToReg (FULL_SPAN))))})
