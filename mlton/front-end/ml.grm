@@ -499,9 +499,14 @@ sigconst :                 => (p ("sigconst1 "); SigConst.None)
        ;
 
 specs  :                   => (p ("specs1 "); Spec.makeRegion (Spec.Empty, Region.bogus))
-       | spec (SEMICOLON? spec)* => (p ("specs2 "); case SR
-                                     of [] => spec
-                                      | _ => List.fold (SR, spec, Spec.seq))
+       | spec (SEMICOLON? spec)* => (p ("specs2 "); 
+				     let
+					 fun specfold ([spec]) = spec
+					   | specfold (x::xs) = Spec.seq(x, specfold xs)
+                                           | specfold _ = raise Fail "Cannot happen."
+				     in
+					 specfold (spec::SR)
+				     end)
        ;
 
 spec : specnode => (p ("spec "); Spec.makeRegion (specnode, posToReg (FULL_SPAN)))
