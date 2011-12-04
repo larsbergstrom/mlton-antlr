@@ -1118,7 +1118,7 @@ patitems : patitem (COMMA patitem)* (COMMA DOTDOTDOT)? => (p ("patitems1 "); (pa
 patitem
    : field EQUALOP pat
      => (p ("patitem1 "); (field, Pat.Item.Field pat))
-   | vidNoEqual constraint (AS pat?)
+   | vidNoEqual constraint (AS pat)?
      => (p ("patitem2 "); (Field.Symbol (Vid.toSymbol vidNoEqual),
       Pat.Item.Vid (vidNoEqual, constraint, SR)))
        ;
