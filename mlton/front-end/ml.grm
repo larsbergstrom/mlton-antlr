@@ -54,7 +54,7 @@ in
 		 right=SourcePos.make({column=colNo2, file=file2, line=lineNo2})})
 end
 
-fun p (s) = if false then Out.outputl (Out.error, s) else ()
+fun p (s) = if true then Out.outputl (Out.error, s) else ()
 
 fun error (reg, msg) = (* Control.error (reg, Layout.str msg, Layout.empty) *) ()
 
