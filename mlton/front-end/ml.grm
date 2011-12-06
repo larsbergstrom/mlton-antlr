@@ -526,8 +526,8 @@ specnode : VAL valdescs         => (p ("specnode1 "); Spec.Val (Vector.fromList 
          | EXCEPTION exndescs   => (p ("specnode6 "); Spec.Exception (Vector.fromList exndescs))
          | STRUCTURE strdescs   => (p ("specnode7 "); Spec.Structure (Vector.fromList strdescs))
          | %try INCLUDE sigexp       => (p ("specnode8 "); Spec.IncludeSigexp sigexp)
-         | %try INCLUDE sigid sigids (* p. 59 *)
-           => (p ("specnode9 "); Spec.IncludeSigids (Vector.fromList (sigid :: sigids)) )
+         | %try INCLUDE (sigid)+ (* p. 59 *)
+           => (p ("specnode9 "); Spec.IncludeSigids (Vector.fromList SR) )
          | sharespec
            => (p ("specnode10 "); Spec.Sharing {spec = Spec.makeRegion (Spec.Empty, posToReg (FULL_SPAN)),
                           equations = (Vector.new1
@@ -568,11 +568,7 @@ valdesc : var COLON ty  => (p ("valdesc "); Con.ensureSpecify (Vid.toCon (Vid.fr
 exndescs : exndesc (AND exndesc)*   => (p ("exndescs "); exndesc :: SR)
        ;
 
-exndesc : con tyOpt  => (p ("exndesc "); Con.ensureSpecify con; (con, tyOpt))
-       ;
-
-tyOpt :         => (p ("tyOpt1 "); NONE)
-      | OF ty   => (p ("tyOpt2 "); SOME ty)
+exndesc : con (OF ty)?  => (p ("exndesc "); Con.ensureSpecify con; (con, SR))
        ;
 
 (*---------------------------------------------------*)
@@ -589,11 +585,7 @@ funbinds : fctid LPAREN fctarg RPAREN sigconst EQUALOP funbinds'
             end)
        ;
 
-funbinds' : strexp funbinds'2  => (p ("funbinds' "); (strexp, funbinds'2))
-       ;
-
-funbinds'2 :               => (p ("funbinds'2-1 "); [])
-           | AND funbinds  => (p ("funbinds'2-2 "); funbinds)
+funbinds' : strexp (AND funbinds)?  => (p ("funbinds' "); (strexp, case SR of NONE => [] | SOME x => x))
        ;
 
 fctarg : strid COLON sigexp  => (p ("fctarg1 "); FctArg.Structure (strid, sigexp))
@@ -648,9 +640,9 @@ decnolocal
                                                         body = decs})
         | EXCEPTION ebs
           => (p ("decnolocal8 "); Dec.Exception (Vector.fromList ebs))
-        | OPEN longstrids       => (p ("decnolocal9 "); Dec.Open (Vector.fromList longstrids))
-        | fixity vids           => (p ("decnolocal10 "); Dec.Fix {fixity = fixity,
-                                          ops = Vector.fromList vids})
+        | OPEN (longstrid)+       => (p ("decnolocal9 "); Dec.Open (Vector.fromList SR))
+        | fixity (vid)+           => (p ("decnolocal10 "); Dec.Fix {fixity = fixity,
+                                          ops = Vector.fromList SR})
         | OVERLOAD priority var COLON ty AS longvidands
                                 => (p ("decnolocal11 "); Dec.Overload (priority, 
                                                var,
@@ -667,8 +659,9 @@ valbindTop : valbind => (p ("valbindTop "); let
                       end)
        ;
 
-valbind : pat EQUALOP exp valbindRest
+valbind : pat EQUALOP exp (AND valbind)?
           => (p ("valbind1 "); let
+              val valbindRest = case SR of SOME x => x | NONE => ([], [])
               val (vbs, rvbs) = valbindRest
            in
               ({pat = pat, exp = exp} :: vbs,
@@ -678,21 +671,9 @@ valbind : pat EQUALOP exp valbindRest
        ;
 
 
-valbindRest :                          => (p ("valbindRest1 "); ([], []))
-            | AND valbind              => (p ("valbindRest2 "); valbind)
-       ;
-
 rvalbind : REC rvalbind                => (p (" "); rvalbind)
-         | pat EQUALOP FN match rvalbindRest
-            => (p ("rvalbind2 "); {pat = pat, match = match} :: rvalbindRest)
-       ;
-
-rvalbindRest :               => (p ("rvalbindRest1 "); [])
-             | AND rvalbind  => (p ("rvalbindRest2 "); rvalbind)
-       ;
-
-constraint :                    => (NONE)
-           | COLON ty           => (SOME ty)
+         | pat EQUALOP FN match (AND rvalbind)?
+            => (p ("rvalbind2 "); {pat = pat, match = match} :: (case SR of SOME x => x | NONE => []))
        ;
 
 funs    : clausesTop (AND clausesTop)*      => (p ("funs "); clausesTop :: SR)
@@ -704,8 +685,8 @@ clausesTop: clauses => (p ("clausesTop "); Vector.fromList clauses)
 clauses : clause (BAR clause)*    => (p ("clauses "); clause :: SR)
        ;
 
-clause  : apats constraint EQUALOP exp  => (p ("clause "); {pats = Vector.fromList apats,
-                                          resultType = constraint,
+clause  : apats (COLON ty)? EQUALOP exp  => (p ("clause "); {pats = Vector.fromList apats,
+                                          resultType = SR,
                                           body = exp})
        ;
 
@@ -1118,9 +1099,9 @@ patitems : patitem (COMMA patitem)* (COMMA DOTDOTDOT)? => (p ("patitems1 "); (pa
 patitem
    : field EQUALOP pat
      => (p ("patitem1 "); (field, Pat.Item.Field pat))
-   | vidNoEqual constraint (AS pat)?
+   | vidNoEqual (COLON ty)? (AS pat)?
      => (p ("patitem2 "); (Field.Symbol (Vid.toSymbol vidNoEqual),
-      Pat.Item.Vid (vidNoEqual, constraint, SR)))
+      Pat.Item.Vid (vidNoEqual, SR1, SR2)))
        ;
 
 (*---------------------------------------------------*)
@@ -1235,9 +1216,6 @@ vid : idEqual                  => (p ("vid "); Vid.fromSymbol idEqual)
        ;
 vidNoEqual : id                => (p ("vidNoEqual "); Vid.fromSymbol id)
        ;
-vids : vid                     => (p ("vids1 "); [vid])
-     | vid vids                => (p ("vids2 "); vid::vids)
-       ;
 var : idEqual                  => (p ("var "); Var.fromSymbol idEqual)
        ;
 con : id                       => (p ("con "); Con.fromSymbol id)
@@ -1272,9 +1250,6 @@ strid : id                     => (p ("strid "); Strid.fromSymbol id)
        ;
 sigid : id                     => (p ("sigid "); Sigid.fromSymbol id)
        ;
-sigids : sigid                 => (p ("sigids1 "); [sigid])
-       | sigid sigids          => (p ("sigids2 "); sigid :: sigids)
-       ;
 fctid : id                     => (p ("fctid "); Fctid.fromSymbol id)
        ;
 
@@ -1289,5 +1264,3 @@ longcon : longid           => (p ("longcon "); Longcon.fromSymbols longid)
 longstrid : longid         => (p ("longstrid "); Longstrid.fromSymbols longid)
        ;
 
-longstrids : longstrid+             => (p ("longstrids "); longstrid)
-       ;
