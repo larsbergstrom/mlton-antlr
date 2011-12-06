@@ -438,8 +438,8 @@ strexp2node
         | LET strdecs IN strexp END  => (p ("strexp2node4 "); Strexp.Let (strdecs,strexp))
        ;
 
-arg_fct : LPAREN strexp RPAREN   => (p ("arg_fct1 "); strexp)
-        | LPAREN strdecs RPAREN  => (p ("arg_fct2 "); Strexp.makeRegion (Strexp.Struct strdecs, posToReg (FULL_SPAN)))
+arg_fct : LPAREN (strexp RPAREN   => (p ("arg_fct1 "); strexp)
+        | strdecs RPAREN  => (p ("arg_fct2 "); Strexp.makeRegion (Strexp.Struct strdecs, posToReg (FULL_SPAN)))) => (SR)
        ;
 
 (*---------------------------------------------------*)
@@ -534,16 +534,24 @@ specnode : VAL valdescs         => (p ("specnode1 "); Spec.Val (Vector.fromList 
                                        (Equation.makeRegion (sharespec, posToReg (FULL_SPAN))))})
        ;
        
-sharespec : SHARING TYPE longtyconeqns => (p ("sharespec1 "); Equation.Type longtyconeqns)
-          | SHARING longstrideqns      => (p ("sharespec2 "); Equation.Structure longstrideqns)
+sharespec : SHARING (TYPE longtyconeqns => (p ("sharespec1 "); Equation.Type longtyconeqns)
+          | longstrideqns      => (p ("sharespec2 "); Equation.Structure longstrideqns)) => (SR)
        ;
 
-longstrideqns : longstrid EQUALOP longstrid => (p ("longstrideqns1 "); [longstrid1,longstrid2])
-              | longstrid EQUALOP longstrideqns => (p ("longstrideqns2 "); longstrid :: longstrideqns)
+longstrideqns : longstrid EQUALOP (longstrid => (p ("longstrideqns1 "); (true, [longstrid,longstrid]))
+              | longstrideqns => (p ("longstrideqns2 "); (false, longstrid :: longstrideqns))) =>
+		(case SR
+		  of (true, [_, l]) => [longstrid, l]
+		   | (false, l) => l
+		   | _ => raise Fail "Impossible")
        ;
 
-longtyconeqns : longtycon EQUALOP longtycon => (p ("longtyconeqns1 "); [longtycon1,longtycon2])
-              | longtycon EQUALOP longtyconeqns => (p ("longtyconeqns2 "); longtycon :: longtyconeqns)
+longtyconeqns : longtycon EQUALOP (longtycon => (p ("longtyconeqns1 "); (true, [longtycon,longtycon]))
+              | longtyconeqns => (p ("longtyconeqns2 "); (false, longtycon :: longtyconeqns))) => 
+		(case SR
+		  of (true, [_, l]) => [longtycon, l]
+		   | (false, l) => l
+		   | _ => raise Fail "Impossible")
        ;
 
 strdesc : strid COLON sigexp' (WHERE wherespec)*  => (p ("strdesc "); (strid, Sigexp.wheree (sigexp', Vector.fromList SR, posToReg (FULL_SPAN))))
@@ -624,16 +632,16 @@ decnode : decnolocal              => (p ("decnode1 "); decnolocal)
        ;
 
 decnolocal
-        : VAL valbindTop          => (p ("decnolocal1 "); let val (vbs, rvbs) = valbindTop
+        : VAL (valbindTop          => (p ("decnolocal1 "); let val (vbs, rvbs) = valbindTop
                                       in
                                           Dec.Val {tyvars = Vector.new0 (), vbs=vbs, rvbs=rvbs}
                                       end)
-        | VAL tyvarseq valbindTop  => (p ("decnolocal2 "); let val (vbs, rvbs) = valbindTop
+        | tyvarseq valbindTop  => (p ("decnolocal2 "); let val (vbs, rvbs) = valbindTop
                                        in
                                            Dec.Val {tyvars = tyvarseq, vbs=vbs, rvbs=rvbs}
-                                       end)
-        | FUN funs              => (p ("decnolocal3 "); Dec.Fun (Vector.new0 (), Vector.fromList funs))
-        | FUN tyvarseq funs     => (p ("decnolocal4 "); Dec.Fun (tyvarseq, Vector.fromList funs))
+                                       end)) => (SR)
+        | FUN (funs              => (p ("decnolocal3 "); Dec.Fun (Vector.new0 (), Vector.fromList funs))
+        | tyvarseq funs     => (p ("decnolocal4 "); Dec.Fun (tyvarseq, Vector.fromList funs))) => (SR)
         | TYPE typBind          => (p ("decnolocal5 "); Dec.Type typBind)
         | DATATYPE datatypeRhs  => (p ("decnolocal6 "); Dec.Datatype datatypeRhs)
         | ABSTYPE datBind WITH decs END   => (p ("decnolocal7 "); Dec.Abstype {datBind = datBind,
@@ -643,8 +651,8 @@ decnolocal
         | OPEN (longstrid)+       => (p ("decnolocal9 "); Dec.Open (Vector.fromList SR))
         | fixity (vid)+           => (p ("decnolocal10 "); Dec.Fix {fixity = fixity,
                                           ops = Vector.fromList SR})
-        | OVERLOAD priority var COLON ty AS longvidands
-                                => (p ("decnolocal11 "); Dec.Overload (priority, 
+        | OVERLOAD (digit)? var COLON ty AS longvidands
+                                => (p ("decnolocal11 "); Dec.Overload (Priority.T SR, 
                                                var,
                                                Vector.new0 (),
                                                ty,
@@ -737,12 +745,10 @@ tyvar_pc: tyvar (COMMA tyvar)* => (p ("tyvar_pc "); tyvar :: SR)
 constrs : constr (BAR constr)*    => (p ("constrs "); constr :: SR)
        ;
 
-constr  : opcon         => (p ("constr1 "); (opcon, NONE))
-        | opcon OF ty   => (p ("constr2 "); (opcon, SOME ty))
+constr  : opcon (OF ty)?        => (p ("constr1 "); (opcon, SR))
        ;
 
-opcon   : con           => (p ("opcon1 "); con)
-        | OP con        => (p ("opcon2 "); con)
+opcon   : (OP)? con           => (p ("opcon1 "); con)
        ;
 
 ebs     : eb (AND eb)*      => (p ("ebs "); eb::SR)
@@ -756,19 +762,15 @@ ebrhs : ebrhsnode => (p ("ebrhs "); EbRhs.makeRegion (ebrhsnode, posToReg (FULL_
 
 ebrhsnode   :                    => (p ("ebrhsnode1 "); EbRhs.Gen NONE)
             | OF ty              => (p ("ebrhsnode2 "); EbRhs.Gen (SOME ty))
-            | EQUALOP longcon    => (p ("ebrhsnode3 "); EbRhs.Def longcon)
-            | EQUALOP OP longcon => (p ("ebrhsnode4 "); EbRhs.Def longcon)
+            | EQUALOP (longcon    => (p ("ebrhsnode3 "); EbRhs.Def longcon)
+            | OP longcon => (p ("ebrhsnode4 "); EbRhs.Def longcon)) => (SR)
        ;
 
-fixity  : INFIX                 => (p ("fixity1 "); Fixity.Infix NONE)
-        | INFIX digit           => (p ("fixity2 "); Fixity.Infix (SOME digit))
-        | INFIXR                => (p ("fixity3 "); Fixity.Infixr NONE)
-        | INFIXR digit          => (p ("fixity4 "); Fixity.Infixr (SOME digit))
+fixity  : INFIX (                => (p ("fixity1 "); Fixity.Infix NONE)
+        | digit           => (p ("fixity2 "); Fixity.Infix (SOME digit))) => (SR)
+        | INFIXR (                => (p ("fixity3 "); Fixity.Infixr NONE)
+        | digit          => (p ("fixity4 "); Fixity.Infixr (SOME digit))) => (SR)
         | NONFIX                => (p ("fixity5 "); Fixity.Nonfix)
-       ;
-
-priority :                      => (p ("priority1 "); Priority.T NONE)
-         | digit                => (p ("priority2 "); Priority.T (SOME digit))
        ;
 
 int : INT
@@ -948,8 +950,8 @@ aexp    : OP longvid            => (p ("aexp1 "); Exp.Var {name = longvid,
         | LPAREN expnode ( RPAREN                   => (p ("aexp7 "); expnode)
                      | (SEMICOLON exp)+ RPAREN  => (p ("aexp8 "); Exp.Seq (Vector.fromList ((Exp.makeRegion (expnode, posToReg (expnode_SPAN)))::SR)))
                      | (COMMA exp)+ RPAREN  => (p ("aexp9 "); Exp.tuple (Vector.fromList ((Exp.makeRegion (expnode, posToReg (expnode_SPAN)))::SR)))) => (p ("aexp10 "); SR)
-        | LBRACKET exp_list RBRACKET  => (p ("aexp11 "); Exp.List (Vector.fromList exp_list))
-        | LBRACKET RBRACKET           => (p ("aexp12 "); Exp.List (Vector.new0 ()))
+        | LBRACKET (exp_list RBRACKET  => (p ("aexp11 "); Exp.List (Vector.fromList exp_list))
+        | RBRACKET           => (p ("aexp12 "); Exp.List (Vector.new0 ()))) => (SR)
         | LET decs IN ( %try exp_ps END
                        => (p ("aexp13 "); Exp.Let (decs, Exp.makeRegion (Exp.Seq (Vector.fromList exp_ps), posToReg (FULL_SPAN))))
                       | %try exp END   => (p ("aexp14 "); Exp.Let (decs, exp)))
@@ -970,22 +972,22 @@ aexp    : OP longvid            => (p ("aexp1 "); Exp.Var {name = longvid,
           => (p ("aexp20 "); Exp.Prim (PrimKind.Export {attributes = ieattributes,
                                       name = string,
                                       ty = ty}))
-        | IMPORT string ieattributes COLON ty SEMICOLON
+        | IMPORT (string ieattributes COLON ty SEMICOLON
           => (p ("aexp21 "); Exp.Prim (PrimKind.Import {attributes = ieattributes,
                                       name = string,
                                       ty = ty}))
-        | IMPORT ASTERISK ieattributes COLON ty SEMICOLON
+        | ASTERISK ieattributes COLON ty SEMICOLON
           => (p ("aexp22 "); Exp.Prim (PrimKind.IImport {attributes = ieattributes,
-                                       ty = ty}))
+                                       ty = ty}))) => (SR)
         | PRIM string COLON ty SEMICOLON
           => (p ("aexp23 "); Exp.Prim (PrimKind.Prim {name = string,
                                     ty = ty}))
-        | SYMBOL string symattributes COLON ty SEMICOLON
+        | SYMBOL (string symattributes COLON ty SEMICOLON
           => (p ("aexp24 "); Exp.Prim (PrimKind.Symbol {attributes = symattributes,
                                       name = string,
                                       ty = ty}))
-        | SYMBOL ASTERISK COLON ty SEMICOLON
-          => (p ("aexp25 "); Exp.Prim (PrimKind.ISymbol {ty = ty}))
+        | ASTERISK COLON ty SEMICOLON
+          => (p ("aexp25 "); Exp.Prim (PrimKind.ISymbol {ty = ty}))) => (SR)
        ;
 
 ieattributes
@@ -1078,14 +1080,14 @@ apatnode : longvidNoEqual        => (p ("apatnode1 "); Pat.Var {name = longvidNo
         | WILD                   => (p ("apatnode4 "); Pat.Wild)
         | LPAREN pats RPAREN     => (p ("apatnode5 "); Pat.tuple (Vector.fromList pats))
         | LBRACKET pats RBRACKET => (p ("apatnode6 "); Pat.List (Vector.fromList pats))
-        | LBRACE RBRACE          => (p ("apatnode7 "); Pat.unit)
-        | LBRACE patitems RBRACE
+        | LBRACE (RBRACE          => (p ("apatnode7 "); Pat.unit)
+        | patitems RBRACE
           => (p ("apatnode8 "); let
               val (items, flexible) = patitems
            in
               Pat.Record {flexible = flexible,
                           items = Vector.fromList items}
-           end)
+           end)) => (SR)
        ;
 
 pats : (* empty *)      => (p ("pats1 "); [])
@@ -1137,8 +1139,8 @@ ty2 : ty3 longtycon? => (p ("ty2 "); case longtycon
     ;
 
 ty3 : tyvar => (p ("ty3_1 "); Type.Var tyvar)
-    | LBRACE RBRACE => (p ("ty3_2 "); Type.unit)
-    | LBRACE tyrow RBRACE => (p ("ty3_3 "); Type.Record (Srecord.fromVector (Vector.fromList tyrow)))
+    | LBRACE (RBRACE => (p ("ty3_2 "); Type.unit)
+    | tyrow RBRACE => (p ("ty3_3 "); Type.Record (Srecord.fromVector (Vector.fromList tyrow)))) => (SR)
     | longtycon => (p ("ty3_4 "); Type.Con (longtycon, Vector.new0 ()))
     | LPAREN ty RPAREN => (p ("ty3_5 "); Type.node ty)
     ;
