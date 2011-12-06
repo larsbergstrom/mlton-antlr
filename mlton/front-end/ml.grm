@@ -519,15 +519,15 @@ spec : specnode => (p ("spec "); Spec.makeRegion (specnode, posToReg (FULL_SPAN)
    not share this distinction issue.									   
  *)
 specnode : VAL valdescs         => (p ("specnode1 "); Spec.Val (Vector.fromList valdescs))
-         | %try TYPE typBind         => (p ("specnode3 "); Spec.TypeDefs typBind) 
-         | %try TYPE typdescs        => (p ("specnode2 "); Spec.Type (Vector.fromList typdescs))
+         | TYPE (%try typBind         => (p ("specnode3 "); Spec.TypeDefs typBind) 
+         | %try typdescs        => (p ("specnode2 "); Spec.Type (Vector.fromList typdescs))) => (SR)
          | EQTYPE typdescs      => (p ("specnode4 "); Spec.Eqtype (Vector.fromList typdescs))
          | DATATYPE datatypeRhsNoWithtype => (p ("specnode5 "); Spec.Datatype datatypeRhsNoWithtype)
          | EXCEPTION exndescs   => (p ("specnode6 "); Spec.Exception (Vector.fromList exndescs))
          | STRUCTURE strdescs   => (p ("specnode7 "); Spec.Structure (Vector.fromList strdescs))
-         | %try INCLUDE sigexp       => (p ("specnode8 "); Spec.IncludeSigexp sigexp)
-         | %try INCLUDE (sigid)+ (* p. 59 *)
-           => (p ("specnode9 "); Spec.IncludeSigids (Vector.fromList SR) )
+         | INCLUDE (%try sigexp       => (p ("specnode8 "); Spec.IncludeSigexp sigexp)
+         | %try (sigid)+ (* p. 59 *)
+           => (p ("specnode9 "); Spec.IncludeSigids (Vector.fromList SR) )) => (SR)
          | sharespec
            => (p ("specnode10 "); Spec.Sharing {spec = Spec.makeRegion (Spec.Empty, posToReg (FULL_SPAN)),
                           equations = (Vector.new1
