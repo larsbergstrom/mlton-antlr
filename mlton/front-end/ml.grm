@@ -875,17 +875,14 @@ longvidands : longvid  => (p ("longvidands1 "); [longvid])
 match : rules           => (p ("match "); Match.makeRegion (Match.T (Vector.fromList rules), posToReg (FULL_SPAN)))
        ;
 
-rules : %try pat DARROW closedexp BAR rules => (p ("rules1 "); (pat, closedexp)::rules)
-      | %try pat DARROW exp => (p ("rules2 "); [(pat, exp)])
+rules : pat DARROW (%try closedexp BAR rules => (p ("rules1 "); (pat, closedexp)::rules)
+      | %try exp => (p ("rules2 "); [(pat, exp)])) => (p ("rules "); (SR))
       ;
 
 elabel  : field EQUALOP exp     => (p ("elabel "); (field,exp))
        ;
 
 elabels : elabel (COMMA elabel)*  => (p ("elabels "); (elabel :: SR))
-       ;
-
-exp_ps  : exp (SEMICOLON exp)+     => (p ("exp_ps "); (exp :: SR))
        ;
 
 exp : expnode => (p ("exp "); Exp.makeRegion (expnode, posToReg (FULL_SPAN)))
@@ -952,9 +949,9 @@ aexp    : OP longvid            => (p ("aexp1 "); Exp.Var {name = longvid,
                      | (COMMA exp)+ RPAREN  => (p ("aexp9 "); Exp.tuple (Vector.fromList ((Exp.makeRegion (expnode, posToReg (expnode_SPAN)))::SR)))) => (p ("aexp10 "); SR)
         | LBRACKET (exp_list RBRACKET  => (p ("aexp11 "); Exp.List (Vector.fromList exp_list))
         | RBRACKET           => (p ("aexp12 "); Exp.List (Vector.new0 ()))) => (SR)
-        | LET decs IN ( %try exp_ps END
-                       => (p ("aexp13 "); Exp.Let (decs, Exp.makeRegion (Exp.Seq (Vector.fromList exp_ps), posToReg (FULL_SPAN))))
-                      | %try exp END   => (p ("aexp14 "); Exp.Let (decs, exp)))
+        | LET decs IN exp ( (SEMICOLON exp)+ END
+                       => (p ("aexp13 "); Exp.Let (decs, Exp.makeRegion (Exp.Seq (Vector.fromList (exp::SR)), posToReg (FULL_SPAN))))
+                      | END   => (p ("aexp14 "); Exp.Let (decs, exp)))
           => (p ("aexp15 "); SR)
         | ADDRESS string symattributes COLON ty SEMICOLON
           => (p ("aexp16 "); Exp.Prim (PrimKind.Address {attributes = symattributes,

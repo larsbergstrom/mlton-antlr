@@ -75,4 +75,4 @@ ml.lex.sml: ml.lex
 ml.grm.sml: ml.grm
 	rm -f $<.*
 	$(MLANTLR) $<
-	#chmod -w $<.*
+	chmod -w $<.*
