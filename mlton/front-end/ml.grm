@@ -709,14 +709,11 @@ typBind : typBind'
            end)
        ;
 
-typBind' : tyvars tycon EQUALOP ty typBind''
-           => (p ("typbind' "); {def = ty, tycon = tycon, tyvars = tyvars} :: typBind'')
+typBind' : typBind''' (AND typBind''')* => (p ("typbind' "); typBind'''::SR)
        ;
 
-typBind'' :               => (p ("typBind''1 "); [])
-          | AND typBind'  => (p ("typbind''2 "); typBind')
+typBind''' : tyvars tycon EQUALOP ty => (p ("typbind' "); {def = ty, tycon = tycon, tyvars = tyvars})
        ;
-
 
 tyvars  : tyvarseq => (p ("tyvars1 "); tyvarseq)
         |          => (p ("tyvars2 "); Vector.new0 ())
