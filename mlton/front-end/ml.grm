@@ -361,13 +361,6 @@ topdecnode
 strdecs : strdecsnode => (p ("strdecs "); Strdec.makeRegion (strdecsnode, posToReg (FULL_SPAN)))
        ;
 
-(*
-strdecsnode :                    => (p ("strdecsnode1 "); Strdec.Seq [])
-            | SEMICOLON strdecs  => (p ("strdecsnode2 "); Strdec.Seq [strdecs])
-            | strdec strdecs     => (p ("strdecsnode3 "); Strdec.Seq [strdec, strdecs])
-       ;
-*)
-
 strdecsnode : (strdec SEMICOLON?)*  => (p ("strdecsnode1 "); Strdec.Seq SR)
        ;
 
@@ -512,12 +505,6 @@ specs  :                   => (p ("specs1 "); Spec.makeRegion (Spec.Empty, Regio
 spec : specnode => (p ("spec "); Spec.makeRegion (specnode, posToReg (FULL_SPAN)))
        ;
 
-(* typBind/typdescs and sigexp/sigids have the same first several tokens.
-   In this rule, we use backtracking to permit them to co-exist. Otherwise, 
-   we could create a new production that combinds them, but then we would be
-   unable to share the definitions used here with other productions that do
-   not share this distinction issue.									   
- *)
 specnode : VAL valdescs         => (p ("specnode1 "); Spec.Val (Vector.fromList valdescs))
          | TYPE (%try typBind         => (p ("specnode3 "); Spec.TypeDefs typBind) 
          | %try typdescs        => (p ("specnode2 "); Spec.Type (Vector.fromList typdescs))) => (SR)
@@ -554,7 +541,11 @@ longtyconeqns : longtycon EQUALOP (longtycon => (p ("longtyconeqns1 "); (true, [
 		   | _ => raise Fail "Impossible")
        ;
 
-strdesc : strid COLON sigexp' (WHERE wherespec)*  => (p ("strdesc "); (strid, Sigexp.wheree (sigexp', Vector.fromList SR, posToReg (FULL_SPAN))))
+strdesc : strid COLON sigexp' (andwherespec)*  => (p ("strdesc "); (strid, Sigexp.wheree (sigexp', Vector.fromList SR, posToReg (FULL_SPAN))))
+       ;
+
+andwherespec : WHERE wherespec
+             | AND wherespec
        ;
 
 strdescs : strdesc (AND strdesc)*  => (p ("strdescs "); strdesc::SR)
