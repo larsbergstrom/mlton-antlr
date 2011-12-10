@@ -1138,10 +1138,16 @@ ty1 : ty2 (ASTERISK ty2)* => (p ("ty1 "); case SR
                                         end))
     ;
 
-ty2 : ty3 longtycon? => (p ("ty2 "); case longtycon
-                          of NONE => ty3
-                           | SOME con => Type.Con (con,
-                                                   Vector.new1 (Type.makeRegion (ty3, posToReg (ty3_SPAN)))))
+ty2 : ty3 longtycon* => (p ("ty2 "); case longtycon
+                          of [] => ty3
+                           | _ => let
+			   fun tyfold ([x]) = Type.Con (x,
+                                                   Vector.new1 (Type.makeRegion (ty3, posToReg (ty3_SPAN))))
+                             | tyfold (x::xs) = Type.Con (x, Vector.new1 (Type.makeRegion (tyfold xs, posToReg (FULL_SPAN))))
+                             | tyfold ([]) = raise Fail "Invalid tyfold"
+                           in
+                              tyfold (rev longtycon)
+                           end)
     ;
 
 ty3 : tyvar => (p ("ty3_1 "); Type.Var tyvar)
