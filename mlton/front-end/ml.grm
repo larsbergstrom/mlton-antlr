@@ -1145,7 +1145,8 @@ ty3 : tyvar => (p ("ty3_1 "); Type.Var tyvar)
     | LBRACE (RBRACE => (p ("ty3_2 "); Type.unit)
     | tyrow RBRACE => (p ("ty3_3 "); Type.Record (Srecord.fromVector (Vector.fromList tyrow)))) => (SR)
     | longtycon => (p ("ty3_4 "); Type.Con (longtycon, Vector.new0 ()))
-    | LPAREN ty RPAREN => (p ("ty3_5 "); Type.node ty)
+    | %try LPAREN ty (COMMA ty)+ RPAREN longtycon => (p ("ty3_6 "); Type.Con (longtycon, Vector.fromList (ty::SR)))
+    | %try LPAREN ty RPAREN => (p ("ty3_5 "); Type.node ty)
     ;
 
 tyrow' : field COLON ty => (p ("tyrow' "); (field, ty))
