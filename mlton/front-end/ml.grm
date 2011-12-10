@@ -882,22 +882,14 @@ elabel  : field EQUALOP exp     => (p ("elabel "); (field,exp))
 elabels : elabel (COMMA elabel)*  => (p ("elabels "); (elabel :: SR))
        ;
 
+
 exp : expnode => (p ("exp "); Exp.makeRegion (expnode, posToReg (FULL_SPAN)))
        ;
 
-expnode : %try exp'' ORELSE exp        => (p ("expnode2 "); Exp.Orelse (Exp.makeRegion (exp'', posToReg exp''_SPAN), exp))
-        | %try exp'' ANDALSO exp       => (p ("expnode3 "); Exp.Andalso (Exp.makeRegion (exp'', posToReg exp''_SPAN), exp))
-        | %try exp''                   => (p ("expnode1 "); exp'') 
-           ;
-
-
-exp'' : %try exp' HANDLE match      => (p ("exp''1 "); Exp.Handle (Exp.makeRegion (exp', posToReg exp'_SPAN), match))
-      | %try exp' COLON ty          => (p ("exp''2 "); Exp.Constraint (Exp.makeRegion (exp', posToReg exp'_SPAN), ty))
-      | %try exp'                   => (p ("exp''3 "); exp')
-        ;
-
-
-exp' : app_exp               => (p ("exp'1 "); Exp.FlatApp (Vector.fromList app_exp))
+expnode : orelseexp (HANDLE match)?
+                => (case SR
+ 		     of NONE => orelseexp
+		     |  SOME m => Exp.Handle (Exp.makeRegion (orelseexp, posToReg orelseexp_SPAN), m))
         | FN match              => (p ("exp'2 "); Exp.Fn match)
         | CASE exp OF match     => (p ("exp'3 "); Exp.Case (exp, match))
         | WHILE exp DO exp      => (p ("exp'4 "); Exp.While {test = exp1, expr = exp2})
@@ -908,20 +900,40 @@ exp' : app_exp               => (p ("exp'1 "); Exp.FlatApp (Vector.fromList app_
 closedexp : closedexpnode => (p ("closedexp "); Exp.makeRegion (closedexpnode, posToReg (FULL_SPAN)))
        ;
 
-closedexpnode : %try closedexp'' ORELSE closedexp        => (p ("closedexpnode2 "); Exp.Orelse (Exp.makeRegion (closedexp'', posToReg closedexp''_SPAN), closedexp))
-              | %try closedexp'' ANDALSO closedexp       => (p ("closedexpnode3 "); Exp.Andalso (Exp.makeRegion (closedexp'', posToReg closedexp''_SPAN), closedexp))
-              | %try closedexp''                         => (p ("closedexpnode1 "); closedexp'') 
-           ;
+closedexpnode : orelseexp       => (p ("closedexpnode "); orelseexp)
+        | WHILE exp DO closedexp      => (p ("exp'4 "); Exp.While {test = exp, expr = closedexp})
+        | IF exp THEN exp ELSE closedexp => (p ("exp'5 "); Exp.If (exp1, exp2, closedexp))
+        | RAISE closedexp             => (p ("exp'6 "); Exp.Raise closedexp)
+       ;
 
-closedexp'' : %try closedexp' HANDLE match      => (p ("closedexp''1 "); Exp.Handle (Exp.makeRegion (closedexp', posToReg closedexp'_SPAN), match))
-            | %try closedexp' COLON ty          => (p ("closedexp''2 "); Exp.Constraint (Exp.makeRegion (closedexp', posToReg closedexp'_SPAN), ty))
-            | %try closedexp'                   => (p ("closedexp''3 "); closedexp')
-        ;
+orelseexp : andalsoexp (ORELSE andalsoexp)* 
+                   => (p ("orelseexp ");
+		       let
+		         fun orelsefold ([x]) = x
+			 |   orelsefold (x::xs) = Exp.Orelse (Exp.makeRegion (x, posToReg FULL_SPAN),
+			               Exp.makeRegion (orelsefold xs, posToReg FULL_SPAN))
+			 |   orelsefold ([]) = raise Fail "Invalid"
+		       in
+		         orelsefold (andalsoexp::SR)
+		       end)
+       ;
+                     
+andalsoexp : constraintexp (ANDALSO constraintexp)* 
+                   => (p ("andalsoexp ");
+		       let
+		         fun andalsofold ([x]) = x
+			 |   andalsofold (x::xs) = Exp.Andalso (Exp.makeRegion (x, posToReg FULL_SPAN),
+			               Exp.makeRegion (andalsofold xs, posToReg FULL_SPAN))
+			 |   andalsofold ([]) = raise Fail "Invalid"
+		       in
+		         andalsofold (constraintexp::SR)
+		       end)
+       ;
 
-closedexp' : app_exp               => (p ("closedexp'1 "); Exp.FlatApp (Vector.fromList app_exp))
-        | WHILE exp DO closedexp      => (p ("closedexp'2 "); Exp.While {test = exp, expr = closedexp})
-        | IF exp THEN exp ELSE closedexp => (p ("closedexp'3 "); Exp.If (exp1, exp2, closedexp))
-        | RAISE closedexp             => (p ("closedexp'4 "); Exp.Raise closedexp)
+constraintexp : app_exp (COLON ty)?
+                => (case SR
+ 		     of NONE => Exp.FlatApp (Vector.fromList app_exp)
+		     |  SOME t => Exp.Constraint (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), t))
        ;
 
 app_exp : aexp'+
