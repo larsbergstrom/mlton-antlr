@@ -868,14 +868,10 @@ elabel  : field EQUALOP exp     => (p ("elabel "); (field,exp))
 elabels : elabel (COMMA elabel)*  => (p ("elabels "); (elabel :: SR))
        ;
 
-
 exp : expnode => (p ("exp "); Exp.makeRegion (expnode, posToReg (FULL_SPAN)))
        ;
 
-expnode : orelseexp (HANDLE match)?
-                => (case SR
- 		     of NONE => orelseexp
-		     |  SOME m => Exp.Handle (Exp.makeRegion (orelseexp, posToReg orelseexp_SPAN), m))
+expnode : exp1
         | FN match              => (p ("exp'2 "); Exp.Fn match)
         | CASE exp OF match     => (p ("exp'3 "); Exp.Case (exp, match))
         | WHILE exp DO exp      => (p ("exp'4 "); Exp.While {test = exp1, expr = exp2})
@@ -883,43 +879,27 @@ expnode : orelseexp (HANDLE match)?
         | RAISE exp             => (p ("exp'6 "); Exp.Raise exp)
        ;
 
+exp1 : app_exp ( COLON ty => (Exp.Constraint (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), ty))
+               | ANDALSO exp => (Exp.Andalso (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), exp))
+               | ORELSE exp => (Exp.Orelse (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), exp))
+               | HANDLE match => (Exp.Handle (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), match))
+               | (* empty *)  => (Exp.FlatApp (Vector.fromList app_exp))) => (SR)
+       ;
+
 closedexp : closedexpnode => (p ("closedexp "); Exp.makeRegion (closedexpnode, posToReg (FULL_SPAN)))
        ;
 
-closedexpnode : orelseexp       => (p ("closedexpnode "); orelseexp)
+closedexpnode : closedexp1       => (p ("closedexpnode "); closedexp1)
         | WHILE exp DO closedexp      => (p ("exp'4 "); Exp.While {test = exp, expr = closedexp})
         | IF exp THEN exp ELSE closedexp => (p ("exp'5 "); Exp.If (exp1, exp2, closedexp))
         | RAISE closedexp             => (p ("exp'6 "); Exp.Raise closedexp)
        ;
 
-orelseexp : andalsoexp (ORELSE andalsoexp)* 
-                   => (p ("orelseexp ");
-		       let
-		         fun orelsefold ([x]) = x
-			 |   orelsefold (x::xs) = Exp.Orelse (Exp.makeRegion (x, posToReg FULL_SPAN),
-			               Exp.makeRegion (orelsefold xs, posToReg FULL_SPAN))
-			 |   orelsefold ([]) = raise Fail "Invalid"
-		       in
-		         orelsefold (andalsoexp::SR)
-		       end)
-       ;
-                     
-andalsoexp : constraintexp (ANDALSO constraintexp)* 
-                   => (p ("andalsoexp ");
-		       let
-		         fun andalsofold ([x]) = x
-			 |   andalsofold (x::xs) = Exp.Andalso (Exp.makeRegion (x, posToReg FULL_SPAN),
-			               Exp.makeRegion (andalsofold xs, posToReg FULL_SPAN))
-			 |   andalsofold ([]) = raise Fail "Invalid"
-		       in
-		         andalsofold (constraintexp::SR)
-		       end)
-       ;
-
-constraintexp : app_exp (COLON ty)?
-                => (case SR
- 		     of NONE => Exp.FlatApp (Vector.fromList app_exp)
-		     |  SOME t => Exp.Constraint (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), t))
+closedexp1 : app_exp ( COLON ty => (Exp.Constraint (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), ty))
+               | ANDALSO closedexp => (Exp.Andalso (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), closedexp))
+               | ORELSE closedexp => (Exp.Orelse (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), closedexp))
+               | HANDLE match => (Exp.Handle (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), match))
+               | (* empty *)  => (Exp.FlatApp (Vector.fromList app_exp))) => (SR)
        ;
 
 app_exp : aexp'+
