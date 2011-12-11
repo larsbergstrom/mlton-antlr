@@ -1,4 +1,4 @@
-signature S = sig
-      structure Slice : SLICE where type a = b
-                                and type c = d
-end
+fun toString {arcs, isAbs, vol} =
+if true andalso case arcs of ("" :: _) => true | _ => false
+   then ()
+   else ()

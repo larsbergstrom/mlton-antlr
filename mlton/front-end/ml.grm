@@ -462,9 +462,6 @@ andspecs
                  | wherespecs'  => (p ("andspecs3 "); wherespec :: wherespecs')) => (SR)
        ;
 
-sigbinds: sigid EQUALOP sigexp' sigbinds'  => (p ("sigbinds "); augment (sigid, sigexp', sigbinds'))
-       ;
-
 sigexp' : sigexp'node => (p ("sigexp' "); Sigexp.makeRegion (sigexp'node, posToReg (FULL_SPAN)))
        ;
 
@@ -472,13 +469,11 @@ sigexp'node : sigid                      => (p ("sigexp'node1 "); Sigexp.Var sig
             | SIG specs END              => (p ("sigexp'node2 "); Sigexp.Spec specs)
        ;
 
-sigbinds':                             => (p ("sigbinds'1 "); ([], translatePos (FULL_SPAN), []))
-         | AND sigbinds                => (p ("sigbinds'2 "); ([], translatePos (FULL_SPAN), sigbinds))
-         | WHERE wherespec sigbinds''  => (p ("sigbinds'3 "); cons1 (wherespec, sigbinds''))
+sigbinds: sigbind (AND sigbind)* => (p ("sigbinds "); (sigbind::SR))
        ;
 
-sigbinds'' : sigbinds'                 => (p ("sigbinds''1 "); sigbinds')
-           | AND wherespec sigbinds''  => (p ("sigbinds''2 "); cons1 (wherespec,sigbinds''))
+sigbind : sigid EQUALOP sigexp' (andwherespec)* => (p ("sigbind "); 
+                 (sigid, Sigexp.wheree (sigexp', Vector.fromList SR, posToReg FULL_SPAN)))
        ;
 
 wherespec  : TYPE tyvars longtycon EQUALOP ty  => (p ("wherespec "); {tyvars = tyvars,
@@ -1145,8 +1140,8 @@ ty3 : tyvar => (p ("ty3_1 "); Type.Var tyvar)
     | LBRACE (RBRACE => (p ("ty3_2 "); Type.unit)
     | tyrow RBRACE => (p ("ty3_3 "); Type.Record (Srecord.fromVector (Vector.fromList tyrow)))) => (SR)
     | longtycon => (p ("ty3_4 "); Type.Con (longtycon, Vector.new0 ()))
-    | %try LPAREN ty (COMMA ty)+ RPAREN longtycon => (p ("ty3_6 "); Type.Con (longtycon, Vector.fromList (ty::SR)))
-    | %try LPAREN ty RPAREN => (p ("ty3_5 "); Type.node ty)
+    | LPAREN ty (%try (COMMA ty)+ RPAREN longtycon => (p ("ty3_6 "); Type.Con (longtycon, Vector.fromList (ty::SR)))
+    | %try RPAREN => (p ("ty3_5 "); Type.node ty)) => (SR)
     ;
 
 tyrow' : field COLON ty => (p ("tyrow' "); (field, ty))
