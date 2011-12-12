@@ -33,7 +33,6 @@ in
 end
 
 fun lexAndParse (file: File.t, ins: In.t): Ast.Program.t = let
-    val _ = Out.outputl (Out.error, concat["Parsing file: ", file])
     val source = Source.new file
     val sm = AntlrStreamPos.mkSourcemap()
     val lexer = MLLexer.lex sm {source=source}
@@ -47,7 +46,7 @@ fun lexAndParse (file: File.t, ins: In.t): Ast.Program.t = let
     val _ = SourceMap.setMap(sm)
 in
     case Parser.parse lexer (MLLexer.streamifyInstream ins)
-     of (SOME pt, _, []) => (Out.outputl (Out.error, concat["SUCCESS parsing file: ", file]); pt)
+     of (SOME pt, _, []) => (pt)
       | (_, _, errs) => (
         let
 	    val _ = Out.outputl (Out.error, concat["FAILURE parsing file: ", file])
