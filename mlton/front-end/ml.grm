@@ -236,104 +236,24 @@ fun ensureNonqualified (ss: Symbol.t list, r: Region.t): Symbol.t * Region.t =
     | _ => (error (r, "expected nonqualified id")
             ; (Symbol.bogus, r))
 
-fun cons1 (x, (l, r, y)) = (x :: l, r, y)
-
-fun augment (id : Sigid.t, sigexp : Sigexp.t, (wherespecs : wherespec list, right : SourcePos.t, binds)) =
-   (id, Sigexp.wheree (sigexp, Vector.fromList wherespecs,
-                       Region.extendRight (Sigexp.region sigexp, right)))
-   :: binds
-
-fun 'a augment1 ((strexp: Strexp.t,
-                  makesigconst: Sigexp.t -> SigConst.t,
-                  sigexp: Sigexp.t),
-                 (wherespecs: wherespec list,
-                  right : SourcePos.t,
-                  z: 'a)): Strexp.t * 'a =
-   (Strexp.makeRegion
-    (Strexp.Constrained
-     (strexp, makesigconst (Sigexp.wheree
-                            (sigexp, Vector.fromList wherespecs,
-                             Region.extendRight (Sigexp.region sigexp, right)))),
-     Region.extendRight (Strexp.region strexp, right)),
-    z)
-
-type 'a whereAnd = wherespec list * Region.t * 'a list
-
 );
 
 %header (functor MLParserFun (structure Lex : ANTLR_LEXER
                               structure SourceMap : SOURCE_MAP
                               structure Ast: AST));
 
-(*
-%verbose
-%pos SourcePos.t
-%eop EOF
-%noshift EOF
-
-%header (functor MLLrValsFun (structure Token: TOKEN
-                              structure Ast: AST))
-
-
-%nonassoc WITHTYPE
-%right AND
-%right ARROW
-%right DARROW 
-%left DO
-%left ELSE
-%left RAISE
-%right HANDLE
-%left ORELSE
-%left ANDALSO
-%right AS
-%left COLON
-
-%name ML
-
-%keyword ABSTYPE AND AS CASE DATATYPE DOTDOTDOT ELSE END 
-  EQTYPE EXCEPTION  DO  DARROW  FN  FUN  FUNCTOR  HANDLE
-  IF IN INCLUDE  INFIX  INFIXR  LET  LOCAL  NONFIX  OF  OP
-  OPEN OVERLOAD  RAISE  REC  SHARING  SIG  SIGNATURE  STRUCT
-  STRUCTURE THEN TYPE VAL WHILE WHERE WITH WITHTYPE
-  ORELSE ANDALSO
-
-%change -> VAL | -> THEN | -> ELSE | -> LPAREN | -> SEMICOLON | 
-        DARROW -> EQUALOP | EQUALOP -> DARROW | AND -> ANDALSO | COLON -> OF |
-        SEMICOLON -> COMMA | COMMA -> SEMICOLON |
-        -> IN LONGID END | -> ELSE LONGID
-
-%value CHAR (IntInf.fromInt (Char.ord #"a"))
-%value INT ({digits = "0", negate = false, radix = StringCvt.DEC})
-%value LONGID ("bogus")
-%value REAL ("13.0")
-%value STRING (Vector.fromList [])
-%value TYVAR ("'a")
-%value WORD ({digits = "0", radix = StringCvt.DEC})
-*)
-
-%start program;
-
 program: expsAndTopdecs => (p ("program "); Program.T expsAndTopdecs)
        ;
 
-expsAndTopdecs : topdec* => ([topdec])
+expsAndTopdecs : (topdec)* => ([SR])
        ;
+
 (*
+expsAndTopdecs : (expOrTopDec)* => (SR)
+       ;
+
 expOrTopDec: exp SEMICOLON => (Topdec.fromExp exp)
-   | topdec => (topdec)
-       ;
-*)
-
-(*
-expsAndTopdecs:
-    exp SEMICOLON expsAndTopdecs  => (p ("expsAndTopDecs1 "); [Topdec.fromExp exp] :: expsAndTopdecs)
-  | topdecs => (p ("expsAndTopdecs2 "); topdecs)
-       ;
-
-topdecs:
-      => (p ("topdecs1 "); [])
-  | topdec topdecs => (p ("topdecs2 "); consTopdec (topdec, topdecs))
-  | SEMICOLON expsAndTopdecs => (p ("topdecs3 "); [] :: expsAndTopdecs)
+           | topdec => (topdec) 
        ;
 *)
 
@@ -418,16 +338,17 @@ strexpnode
                                                     (sigexp', ws, posToReg (FULL_SPAN)))))
                             | NONE => (p ("strexpnode2_none "); Strexp.Constrained(strexp2,
                                                           SigConst.Opaque (sigexp')))
-                      end)
-            | (* empty *)
-            => (p ("strexpnode3 "); strexp2node)) => (p ("strexpnode_top "); SR)
+                      end))? => (case SR
+				  of NONE => strexp2node
+				   | SOME ans => ans)
        ;
 
 strexp2node
-        : longid                     => (p ("strexp2node1 "); Strexp.Var (Longstrid.fromSymbols longid))
+        : longid (arg_fct)?          => (p ("strexp2node1 ");
+					 case SR
+					  of NONE => Strexp.Var (Longstrid.fromSymbols longid)
+					   | SOME arg_fct => Strexp.App (Fctid.fromSymbol (ensureNonqualified longid), arg_fct))
         | STRUCT strdecs END         => (p ("strexp2node2 "); Strexp.Struct strdecs)
-        | longid arg_fct
-          => (p ("strexp2node3 "); Strexp.App (Fctid.fromSymbol (ensureNonqualified longid), arg_fct))
         | LET strdecs IN strexp END  => (p ("strexp2node4 "); Strexp.Let (strdecs,strexp))
        ;
 
@@ -622,12 +543,12 @@ decnolocal
                                       in
                                           Dec.Val {tyvars = Vector.new0 (), vbs=vbs, rvbs=rvbs}
                                       end)
-        | tyvarseq valbindTop  => (p ("decnolocal2 "); let val (vbs, rvbs) = valbindTop
+             | tyvarseq valbindTop  => (p ("decnolocal2 "); let val (vbs, rvbs) = valbindTop
                                        in
                                            Dec.Val {tyvars = tyvarseq, vbs=vbs, rvbs=rvbs}
                                        end)) => (SR)
         | FUN (funs              => (p ("decnolocal3 "); Dec.Fun (Vector.new0 (), Vector.fromList funs))
-        | tyvarseq funs     => (p ("decnolocal4 "); Dec.Fun (tyvarseq, Vector.fromList funs))) => (SR)
+             | tyvarseq funs     => (p ("decnolocal4 "); Dec.Fun (tyvarseq, Vector.fromList funs))) => (SR)
         | TYPE typBind          => (p ("decnolocal5 "); Dec.Type typBind)
         | DATATYPE datatypeRhs  => (p ("decnolocal6 "); Dec.Datatype datatypeRhs)
         | ABSTYPE datBind WITH decs END   => (p ("decnolocal7 "); Dec.Abstype {datBind = datBind,
@@ -740,11 +661,13 @@ ebs     : eb (AND eb)*      => (p ("ebs "); eb::SR)
 eb      : opcon ebrhs     => (p ("eb "); Con.ensureRedefine opcon; (opcon, ebrhs))
        ;
 
-ebrhs : ebrhsnode => (p ("ebrhs "); EbRhs.makeRegion (ebrhsnode, posToReg (FULL_SPAN)))
+ebrhs : (ebrhsnode)? => (p ("ebrhs ");
+			 case SR
+			  of SOME n => EbRhs.makeRegion (n, posToReg (FULL_SPAN))
+			   | NONE => EbRhs.makeRegion (EbRhs.Gen NONE, posToReg FULL_SPAN))
        ;
 
-ebrhsnode   :                    => (p ("ebrhsnode1 "); EbRhs.Gen NONE)
-            | OF ty              => (p ("ebrhsnode2 "); EbRhs.Gen (SOME ty))
+ebrhsnode   : OF ty              => (p ("ebrhsnode2 "); EbRhs.Gen (SOME ty))
             | EQUALOP (longcon    => (p ("ebrhsnode3 "); EbRhs.Def longcon)
             | OP longcon => (p ("ebrhsnode4 "); EbRhs.Def longcon)) => (SR)
        ;
