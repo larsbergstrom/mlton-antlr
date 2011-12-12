@@ -244,7 +244,6 @@ fun ensureNonqualified (ss: Symbol.t list, r: Region.t): Symbol.t * Region.t =
 
 program: expsAndTopdecs => (p ("program "); Program.T expsAndTopdecs)
        ;
-
 expsAndTopdecs : (topdec)* => ([SR])
        ;
 
@@ -252,8 +251,8 @@ expsAndTopdecs : (topdec)* => ([SR])
 expsAndTopdecs : (expOrTopDec)* => (SR)
        ;
 
-expOrTopDec: exp SEMICOLON => (Topdec.fromExp exp)
-           | topdec => (topdec) 
+expOrTopDec: exp SEMICOLON => ([Topdec.fromExp exp])
+           | topdec => ([topdec]) 
        ;
 *)
 
@@ -353,7 +352,7 @@ strexp2node
        ;
 
 arg_fct : LPAREN (strexp RPAREN   => (p ("arg_fct1 "); strexp)
-        | strdecs RPAREN  => (p ("arg_fct2 "); Strexp.makeRegion (Strexp.Struct strdecs, posToReg (FULL_SPAN)))) => (SR)
+                | strdecs RPAREN  => (p ("arg_fct2 "); Strexp.makeRegion (Strexp.Struct strdecs, posToReg (FULL_SPAN)))) => (SR)
        ;
 
 (*---------------------------------------------------*)
@@ -490,17 +489,14 @@ exndesc : con (OF ty)?  => (p ("exndesc "); Con.ensureSpecify con; (con, SR))
 (*                     Functors                      *)
 (*---------------------------------------------------*)
 
-funbinds : fctid LPAREN fctarg RPAREN sigconst EQUALOP funbinds'
-           => (p ("funbinds "); let val (strexp,funbinds) = funbinds'
-            in {name = fctid,
-                arg = FctArg.makeRegion (fctarg, posToReg (FULL_SPAN)),
-                result = sigconst,
-                body = strexp}
-               :: funbinds
-            end)
+funbinds : funbind (AND funbind)* => (funbind::SR)
        ;
 
-funbinds' : strexp (AND funbinds)?  => (p ("funbinds' "); (strexp, case SR of NONE => [] | SOME x => x))
+funbind : fctid LPAREN fctarg RPAREN sigconst EQUALOP strexp
+           => (p ("funbinds "); {name = fctid,
+                arg = FctArg.makeRegion (fctarg, posToReg (FULL_SPAN)),
+                result = sigconst,
+                body = strexp})
        ;
 
 fctarg : strid COLON sigexp  => (p ("fctarg1 "); FctArg.Structure (strid, sigexp))
@@ -539,14 +535,14 @@ decnode : decnolocal              => (p ("decnode1 "); decnolocal)
        ;
 
 decnolocal
-        : VAL (valbindTop          => (p ("decnolocal1 "); let val (vbs, rvbs) = valbindTop
+        : VAL (tyvarseq)? valbindTop  => (p ("decnolocal1 "); let val (vbs, rvbs) = valbindTop
                                       in
-                                          Dec.Val {tyvars = Vector.new0 (), vbs=vbs, rvbs=rvbs}
-                                      end)
-             | tyvarseq valbindTop  => (p ("decnolocal2 "); let val (vbs, rvbs) = valbindTop
-                                       in
-                                           Dec.Val {tyvars = tyvarseq, vbs=vbs, rvbs=rvbs}
-                                       end)) => (SR)
+		                         case SR
+					  of NONE => 
+                                             Dec.Val {tyvars = Vector.new0 (), vbs=vbs, rvbs=rvbs}
+					   | SOME tyvars =>
+                                             Dec.Val {tyvars = tyvars, vbs=vbs, rvbs=rvbs}
+	                              end)
         | FUN (funs              => (p ("decnolocal3 "); Dec.Fun (Vector.new0 (), Vector.fromList funs))
              | tyvarseq funs     => (p ("decnolocal4 "); Dec.Fun (tyvarseq, Vector.fromList funs))) => (SR)
         | TYPE typBind          => (p ("decnolocal5 "); Dec.Type typBind)
