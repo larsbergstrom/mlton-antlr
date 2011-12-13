@@ -777,8 +777,8 @@ longvidands : longvid  => (p ("longvidands1 "); [longvid])
 match : rules           => (p ("match "); Match.makeRegion (Match.T (Vector.fromList rules), posToReg (FULL_SPAN)))
        ;
 
-rules : pat DARROW (%try closedexp BAR rules => (p ("rules1 "); (pat, closedexp)::rules)
-      | %try exp => (p ("rules2 "); [(pat, exp)])) => (p ("rules "); (SR))
+rules : pat DARROW ( %try closedexp BAR rules => (p ("rules1 "); (pat, closedexp)::rules)
+                   | %try exp => (p ("rules2 "); [(pat, exp)])) => (p ("rules "); (SR))
       ;
 
 elabel  : field EQUALOP exp     => (p ("elabel "); (field,exp))
@@ -790,38 +790,97 @@ elabels : elabel (COMMA elabel)*  => (p ("elabels "); (elabel :: SR))
 exp : expnode => (p ("exp "); Exp.makeRegion (expnode, posToReg (FULL_SPAN)))
        ;
 
-expnode : exp1
-        | FN match              => (p ("exp'2 "); Exp.Fn match)
+base : app_exp
+;
+
+primary : FN match              => (p ("exp'2 "); Exp.Fn match)
         | CASE exp OF match     => (p ("exp'3 "); Exp.Case (exp, match))
         | WHILE exp DO exp      => (p ("exp'4 "); Exp.While {test = exp1, expr = exp2})
         | IF exp THEN exp ELSE exp => (p ("exp'5 "); Exp.If (exp1, exp2, exp3))
         | RAISE exp             => (p ("exp'6 "); Exp.Raise exp)
        ;
 
-exp1 : app_exp ( COLON ty => (Exp.Constraint (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), ty))
-               | ANDALSO exp => (Exp.Andalso (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), exp))
-               | ORELSE exp => (Exp.Orelse (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), exp))
-               | HANDLE match => (Exp.Handle (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), match))
-               | (* empty *)  => (Exp.FlatApp (Vector.fromList app_exp))) => (SR)
+tyexp : base (COLON ty)*        => (p ("tyexp "); let
+					fun tyexpfold ([x]) = Exp.Constraint (Exp.makeRegion (base, posToReg base_SPAN), x)
+					  | tyexpfold (x::xs) = Exp.Constraint (Exp.makeRegion (tyexpfold xs, posToReg FULL_SPAN), x)
+					  | tyexpfold ([]) = base
+				    in
+					tyexpfold (rev SR)
+				    end)
+;
+
+andalsoexp : tyexp (ANDALSO andalsoexp)? => (p ("andalsoexp ");
+					     case SR
+					      of NONE => tyexp
+					       | SOME exp => Exp.Andalso (Exp.makeRegion (tyexp, posToReg tyexp_SPAN), Exp.makeRegion (exp, posToReg FULL_SPAN)))
+;
+
+orelseexp : andalsoexp (ORELSE orelseexp)? => (p ("orelseexp "); 
+					     case SR
+					      of NONE => andalsoexp
+					       | SOME exp => Exp.Orelse (Exp.makeRegion (andalsoexp, posToReg andalsoexp_SPAN), Exp.makeRegion (exp, posToReg FULL_SPAN)))
+;
+
+handleexp : orelseexp (HANDLE handleexpmatch)* => (p ("handleexp "); let
+					fun handleexpfold ([x]) = Exp.Handle (Exp.makeRegion (orelseexp, posToReg orelseexp_SPAN), x)
+					  | handleexpfold (x::xs) = Exp.Handle (Exp.makeRegion (handleexpfold xs, posToReg FULL_SPAN), x)
+					  | handleexpfold ([]) = orelseexp
+				    in
+					handleexpfold (rev SR)
+				    end)
+; 
+
+expnode : handleexp
+	| primary
+;
+
+(* FIXME
+ * Need to do this twice more, once each for andalsoexp and orelseexp.
+ *)
+
+(* This production occurs in the _exp_ slot of the terminal _rules_ production
+ * when included via the match node in the _handleexp_ case. It removes the HANDLE
+ * expression from recursive inclusion in its RHS.
+ *)
+orelseexp' : orelseexpnode => (p ("orelseexp "); Exp.makeRegion (orelseexpnode, posToReg (FULL_SPAN)))
        ;
+
+orelseexpnode : orelseexp
+	      | orelseprimary
+	      ;
+
+orelseprimary : FN handleexpmatch              => (p ("exp'2 "); Exp.Fn handleexpmatch)
+        | CASE exp OF handleexpmatch     => (p ("exp'3 "); Exp.Case (exp, handleexpmatch))
+        | WHILE exp DO orelseexp'      => (p ("exp'4 "); Exp.While {test = exp, expr = orelseexp'})
+        | IF exp THEN exp ELSE orelseexp' => (p ("exp'5 "); Exp.If (exp1, exp2, orelseexp'))
+        | RAISE orelseexp'             => (p ("exp'6 "); Exp.Raise orelseexp')
+       ;
+
+handleexpmatch : handleexprules  => (p ("handleexpmatch "); Match.makeRegion (Match.T (Vector.fromList handleexprules), posToReg (FULL_SPAN)))
+       ;
+
+handleexprules : pat DARROW ( %try closedexp BAR handleexprules => (p ("rules1 "); (pat, closedexp)::handleexprules)
+                   | %try orelseexp' => (p ("rules2 "); [(pat, orelseexp')])) => (p ("rules "); (SR))
+      ;
+
+(* The _closed_ expressions are for use inside of a match expression
+ * where we need to make sure that there are no additional recursive
+ * terminal-match productions.
+ *)
 
 closedexp : closedexpnode => (p ("closedexp "); Exp.makeRegion (closedexpnode, posToReg (FULL_SPAN)))
        ;
 
-closedexpnode : closedexp1       => (p ("closedexpnode "); closedexp1)
-        | WHILE exp DO closedexp      => (p ("exp'4 "); Exp.While {test = exp, expr = closedexp})
+closedexpnode : handleexp
+	      | closedprimary
+       ;
+
+closedprimary : WHILE exp DO closedexp      => (p ("exp'4 "); Exp.While {test = exp, expr = closedexp})
         | IF exp THEN exp ELSE closedexp => (p ("exp'5 "); Exp.If (exp1, exp2, closedexp))
         | RAISE closedexp             => (p ("exp'6 "); Exp.Raise closedexp)
        ;
 
-closedexp1 : app_exp ( COLON ty => (Exp.Constraint (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), ty))
-               | ANDALSO closedexp => (Exp.Andalso (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), closedexp))
-               | ORELSE closedexp => (Exp.Orelse (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), closedexp))
-               | HANDLE match => (Exp.Handle (Exp.makeRegion (Exp.FlatApp (Vector.fromList app_exp), posToReg app_exp_SPAN), match))
-               | (* empty *)  => (Exp.FlatApp (Vector.fromList app_exp))) => (SR)
-       ;
-
-app_exp : aexp'+
+app_exp : (aexp')+  => (Exp.FlatApp (Vector.fromList SR))
       ;
 
 aexp' : aexp => (p ("aexp'1 "); Exp.makeRegion (aexp, posToReg (FULL_SPAN)))
