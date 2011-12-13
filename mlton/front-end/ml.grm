@@ -809,13 +809,13 @@ tyexp : base (COLON ty)*        => (p ("tyexp "); let
 				    end)
 ;
 
-andalsoexp : tyexp (ANDALSO andalsoexp)? => (p ("andalsoexp ");
+andalsoexp : tyexp (ANDALSO andalsoexpnode')? => (p ("andalsoexp ");
 					     case SR
 					      of NONE => tyexp
 					       | SOME exp => Exp.Andalso (Exp.makeRegion (tyexp, posToReg tyexp_SPAN), Exp.makeRegion (exp, posToReg FULL_SPAN)))
 ;
 
-orelseexp : andalsoexp (ORELSE orelseexp)? => (p ("orelseexp "); 
+orelseexp : andalsoexp (ORELSE orelseexpnode')? => (p ("orelseexp "); 
 					     case SR
 					      of NONE => andalsoexp
 					       | SOME exp => Exp.Orelse (Exp.makeRegion (andalsoexp, posToReg andalsoexp_SPAN), Exp.makeRegion (exp, posToReg FULL_SPAN)))
@@ -834,9 +834,51 @@ expnode : handleexp
 	| primary
 ;
 
-(* FIXME
- * Need to do this twice more, once each for andalsoexp and orelseexp.
+(* This production occurs in the _exp_ slot of the terminal _orelseexp_ production.
  *)
+andalsoexp'' : andalsoexpnode' => (p ("andalsoexp "); Exp.makeRegion (andalsoexpnode', posToReg (FULL_SPAN)))
+       ;
+
+andalsoexpnode' : andalsoexp
+	      | andalsoprimary'
+	      ;
+
+andalsoprimary' : FN andalsoexpmatch              => (p ("exp'2 "); Exp.Fn andalsoexpmatch)
+        | CASE exp OF andalsoexpmatch     => (p ("exp'3 "); Exp.Case (exp, andalsoexpmatch))
+        | WHILE exp DO andalsoexp''      => (p ("exp'4 "); Exp.While {test = exp, expr = andalsoexp''})
+        | IF exp THEN exp ELSE andalsoexp'' => (p ("exp'5 "); Exp.If (exp1, exp2, andalsoexp''))
+        | RAISE andalsoexp''             => (p ("exp'6 "); Exp.Raise andalsoexp'')
+       ;
+
+andalsoexpmatch : andalsoexprules  => (p ("handleexpmatch "); Match.makeRegion (Match.T (Vector.fromList andalsoexprules), posToReg (FULL_SPAN)))
+       ;
+
+andalsoexprules : pat DARROW ( %try closedexp BAR andalsoexprules => (p ("rules1 "); (pat, closedexp)::andalsoexprules)
+                   | %try andalsoexp'' => (p ("rules2 "); [(pat, andalsoexp'')])) => (p ("rules "); (SR))
+      ;
+
+(* This production occurs in the _exp_ slot of the terminal _orelseexp_ production.
+ *)
+orelseexp'' : orelseexpnode' => (p ("orelseexp "); Exp.makeRegion (orelseexpnode', posToReg (FULL_SPAN)))
+       ;
+
+orelseexpnode' : orelseexp
+	      | orelseprimary'
+	      ;
+
+orelseprimary' : FN orelseexpmatch              => (p ("exp'2 "); Exp.Fn orelseexpmatch)
+        | CASE exp OF orelseexpmatch     => (p ("exp'3 "); Exp.Case (exp, orelseexpmatch))
+        | WHILE exp DO orelseexp''      => (p ("exp'4 "); Exp.While {test = exp, expr = orelseexp''})
+        | IF exp THEN exp ELSE orelseexp'' => (p ("exp'5 "); Exp.If (exp1, exp2, orelseexp''))
+        | RAISE orelseexp''             => (p ("exp'6 "); Exp.Raise orelseexp'')
+       ;
+
+orelseexpmatch : orelseexprules  => (p ("handleexpmatch "); Match.makeRegion (Match.T (Vector.fromList orelseexprules), posToReg (FULL_SPAN)))
+       ;
+
+orelseexprules : pat DARROW ( %try closedexp BAR orelseexprules => (p ("rules1 "); (pat, closedexp)::orelseexprules)
+                   | %try orelseexp'' => (p ("rules2 "); [(pat, orelseexp'')])) => (p ("rules "); (SR))
+      ;
 
 (* This production occurs in the _exp_ slot of the terminal _rules_ production
  * when included via the match node in the _handleexp_ case. It removes the HANDLE
