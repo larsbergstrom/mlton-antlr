@@ -1024,18 +1024,22 @@ pat : patnode   => (Pat.makeRegion (patnode, posToReg FULL_SPAN))
 
 patnode : typedapats (AS typedapats)* 
       => (let
-	      fun patfold (x::rest) = Pat.makeAs (Pat.makeRegion (patfold rest, posToReg FULL_SPAN), Pat.makeRegion (x, posToReg FULL_SPAN))
-		| patfold ([]) = typedapats
+	      fun patfold ([x]) = x
+		| patfold (x::rest) = Pat.makeAs (Pat.makeRegion (x, posToReg FULL_SPAN), Pat.makeRegion (patfold rest, posToReg FULL_SPAN))
+		| patfold _ = raise Fail "impossible"
 	  in
-	      patfold SR
+	      patfold (typedapats::SR)
 	  end)
 ;
 
-typedapats : apats (COLON ty)? => (case SR
-				    of NONE => Pat.FlatApp (Vector.fromList apats)
-				     | SOME ty =>
-				       Pat.Constraint (Pat.makeRegion (Pat.FlatApp (Vector.fromList apats), posToReg apats_SPAN), ty))
-       ;
+typedapats : apats (COLON ty)* 
+      => (let
+	      fun typedfold (x::rest) = Pat.Constraint (Pat.makeRegion (typedfold rest, posToReg FULL_SPAN), x)
+		| typedfold ([]) = Pat.FlatApp (Vector.fromList apats)
+	  in
+	      typedfold SR
+	  end)
+;
 
 apats   : (apat)+                  => (SR)
        ;

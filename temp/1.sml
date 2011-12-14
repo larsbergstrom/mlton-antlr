@@ -1,1 +1,1 @@
-val x = 1
+val rec rec id = fn x => x
