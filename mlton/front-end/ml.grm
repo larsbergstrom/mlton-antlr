@@ -245,21 +245,24 @@ fun ensureNonqualified (ss: Symbol.t list, r: Region.t): Symbol.t * Region.t =
 program: expsAndTopdecs => (p ("program "); Program.T expsAndTopdecs)
        ;
 
-expsAndTopdecs: (topdec)* => ([SR])
+expsAndTopdecs: SEMICOLON* ( (*empty*)       => ([])
+		           | exp topexps     => ([Topdec.fromExp exp] :: topexps)
+                           | topdec topdecs  => (consTopdec (topdec, topdecs)))
 ;
 
-(*
-expsAndTopdecs:
-    exp SEMICOLON expsAndTopdecs => ([Topdec.fromExp exp] :: expsAndTopdecs)
-  | topdecs
+topexps: (* empty *)                  => ([])
+        | SEMICOLON+ ((* empty *)     => ([])
+                    | exp topexps     => ([Topdec.fromExp exp] :: topexps)
+                    | topdec topdecs  => (consTopdec (topdec, topdecs)))
 ;
 
-topdecs:
-    (* empty *) => ([])
-  | topdec topdecs => (consTopdec (topdec, topdecs))
-  | SEMICOLON expsAndTopdecs => ([] :: expsAndTopdecs)
+topdecs: (*empty*)			=> ([])
+       | topdec topdecs			=> (consTopdec (topdec, topdecs))
+       | SEMICOLON+ ( (* empty *)	=> ([])
+                    | exp topexps	=> ([Topdec.fromExp exp] :: topexps)
+                    | topdec topdecs	=> (consTopdec (topdec, topdecs))) 
 ;
-*)
+
 topdec : topdecnode => (p ("topdec "); Topdec.makeRegion (topdecnode, posToReg (FULL_SPAN)))
        ;
 
