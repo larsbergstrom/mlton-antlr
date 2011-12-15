@@ -1140,8 +1140,8 @@ ty3 : tyvar						=> (Type.Var tyvar)
     | LBRACE (RBRACE					=> (Type.unit)
     | tyrow RBRACE					=> (Type.Record (Srecord.fromVector (Vector.fromList tyrow)))) => (SR)
     | longtycon						=> (Type.Con (longtycon, Vector.new0 ()))
-    | LPAREN ty (%try (COMMA ty)+ RPAREN longtycon	=> (Type.Con (longtycon, Vector.fromList (ty::SR)))
-               | %try RPAREN				=> (Type.node ty)) => (SR)
+    | LPAREN ty ((COMMA ty)+ RPAREN longtycon	        => (Type.Con (longtycon, Vector.fromList (ty::SR)))
+                | RPAREN				=> (Type.node ty)) => (SR)
     ;
 
 tyrow' : field COLON ty => ((field, ty))
