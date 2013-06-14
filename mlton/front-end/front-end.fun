@@ -24,7 +24,11 @@ structure Parser = MLParserFun (structure Lex = MLLexer
                                 structure Ast = Ast)
 
 fun posToReg (map, pos) = let
-    val {fileName = file, lineNo=lineNo, colNo=colNo} = AntlrStreamPos.sourceLoc map pos
+(*    val {fileName = file, lineNo=lineNo, colNo=colNo} = AntlrStreamPos.sourceLoc map pos *)
+    (* HACK: testing the cost of sourceLoc *)
+    val file = NONE
+    val lineNo = 0
+    val colNo = 0
     val file = case file of SOME x => x | NONE => ""
     val sp = SourcePos.make({column=colNo, file=file, line=lineNo})
 in
